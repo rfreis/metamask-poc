@@ -1,0 +1,124 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.7.1-rc.0/web3.min.js" integrity="sha512-Ui9NE+/XdhwxssTrWetwWgpwpZJCLgTpB2dgkq+xe3O7lmZEJe+2rw3OT3YbYIUCQWH5dOO8ObLOYmbUVpPBgw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://unpkg.com/vue@3.2.31/dist/vue.global.js"></script>
+<script type="module">
+  const App = Vue.createApp({
+    data() {
+      return {
+        loading: true,
+        metaMaskAvailable: false,
+        id: 0,
+        recipientAddress: null,
+        value: 0,
+        error: null,
+        tx: null,
+      }
+    },
+    computed: {
+      selectedAddress() {
+        if (this.metaMaskAvailable) {
+          return window.ethereum.selectedAddress
+        }
+        return null
+      },
+    },
+    mounted() {
+      window.setTimeout(function() {
+        this.metaMaskAvailable = this.checkIfMetaMaskIsAvailable()
+        this.loading = false
+      }.bind(this), 2500)
+    },
+    methods: {
+      checkIfMetaMaskIsAvailable() {
+        if (typeof window.ethereum !== 'undefined') {
+          if (window.ethereum.isMetaMask === true) {
+            return window.ethereum.selectedAddress !== null
+          }
+        }
+        return false
+      },
+      enableMetaMask() {
+        this.error = null
+        window.ethereum.request(
+          { method: 'eth_requestAccounts' }
+        )
+        .then(data => {
+          this.metaMaskAvailable = this.checkIfMetaMaskIsAvailable()
+        })
+        .catch(error => {
+          if (error.message) { this.error = error.message }
+          else { this.error = error }
+        })
+      },
+      requestTransaction() {
+        this.error = null
+        this.tx = null
+        const value = this.toHex(
+          this.toWei(this.value)
+        )
+        const params = [
+          {
+            'from': this.selectedAddress,
+            'to': this.recipientAddress,
+            'value': value,
+          }
+        ]
+        window.ethereum.request({
+          'jsonrpc': '2.0',
+          'method': 'eth_sendTransaction',
+          'params': params,
+          'id': this.id
+        })
+        .then(data => {
+          this.tx = data
+        })
+        .catch(error => {
+          if (error.message) { this.error = error.message }
+          else { this.error = error }
+        })
+      },
+      toHex(value) {
+        return Web3.utils.toHex(value)
+      },
+      toWei(value) {
+        return Web3.utils.toWei(value, 'ether')
+      },
+    }
+  })
+
+  window.onload = function(){
+    App.mount('#app')
+  }
+
+</script>
+
+<div id="app">
+  <div v-if="loading">Loading...</div>
+  <div v-else>
+    <p>{{ metaMaskAvailable }}</p>
+    <button @click="metaMaskAvailable = checkIfMetaMaskIsAvailable()">
+      Reload
+    </button>
+    <template v-if="!metaMaskAvailable">
+      <button @click="enableMetaMask">
+        Enable MetaMask
+      </button>
+      <br />
+      <a target="_blank" href="https://metamask.zendesk.com/hc/en-us/articles/360045901112-Manually-connecting-to-a-dapp">
+        Click here to see how to manually connect the MetaMask
+      </a>
+    </template>
+    <p v-if="tx" style="color: green;">Tx created: <a :href="`https://etherscan.io/tx/${tx}`" target="_blank">{{ tx }}</a></p>
+    <p v-if="error" style="color: red;">Error: {{ error }}</p>
+    <template v-if="metaMaskAvailable">
+      <hr />
+      <p>Selected address: <b>{{ selectedAddress }}</b></p>
+      <label>Recipient address:</label>
+      <input v-model="recipientAddress" type="text" />
+      <label>Value (in ETH):</label>
+      <input v-model="value" type="text" />
+      <button @click="requestTransaction">
+        Request Transaction
+      </button>
+    </template>
+  </div>
+</div>
